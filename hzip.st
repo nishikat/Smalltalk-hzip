@@ -34,23 +34,33 @@ freqTable := Array new: 256.
 
 1 to: (Smalltalk arguments size) do: [:index | 
     arg:= (Smalltalk arguments at: index).
-            (arg includes: $-) ifTrue: [
+        (arg includes: $-) ifTrue: [
             (arg includes: $c) ifTrue: [c := true.].
             (arg includes: $t) ifTrue: [t := true.].
             (arg includes: $u) ifTrue: [u := true.].
             (arg includes: $d) ifTrue: [d := true.].
-            ]
-        ].
+        ]
+].
         
         
 Smalltalk arguments size = 0
         ifTrue: [stdout << 'need args (PRINT THIS TO STDERR??)' <<nl.] 
         ifFalse: [
-            stdout << d << nl << t << nl << c << nl << u << nl.
+            (d)
+                ifTrue: [stdout << d << nl << t << nl << c << nl << u << nl.].
+            ((((c|t)not) & u) | (((c|u)not) & t) | (((u|t)not) & c)) 
+                ifFalse: [stdout << 'incompatible or incorrect number of arguments'<<nl.]
+                ifTrue: [
+                    (c | t)
+                        ifTrue: ["compress" stdout<< 'Compress' << nl.]
+                        ifFalse: ["decompress" stdout<< 'Decompress' << nl.]
+                ]
         ]
 "Smalltalk arguments size = 0
    ifTrue: [stdout << 'need args (PRINT THIS TO STDERR??)' <<nl.] 
    ifFalse: [
+   
+   
       Smalltalk arguments do: [:filename |
          |separator|
          separator := '::::::::::::::::::::::::::::::::'.
