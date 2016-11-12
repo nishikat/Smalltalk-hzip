@@ -68,13 +68,6 @@ FileStream extend [
          stdout << "count << ': ' <<" self nextLine << nl.
       ]
    ]
-   " freq [ :fTable |
-        [self atEnd not] whileTrue: [
-            |ordChar|
-            ordChar := self next asInteger.
-            fTable incr: ordChar.
-        ]
-   ] "
 ]
 ""
 Object subclass: Leaf [
@@ -195,7 +188,7 @@ Smalltalk arguments size = 0
                                         (index = 2)
                                             ifTrue: [
                                                 [
-                                                    | infile node1 node2 tree eofLeaf |
+                                                    | infile node1 node2 tree finalTree |
                                                     infile := FileStream open: arg
                                                                     mode: FileStream read.
                                                     "infile2 stuff is just for debug purposes"
@@ -225,9 +218,13 @@ Smalltalk arguments size = 0
                                                         node1 := priority removeFirst.
                                                         node2 := priority removeFirst.
                                                         tree := Tree new: (node1 char)  count: ((node1 count) + (node2 count)) left: node1 right: node2.
-                                                        priority add: tree; inspect. 
+                                                        priority add: tree. 
                                                     ].
-                                                    
+                                                    finalTree := priority removeFirst.
+                                                    stdout << nl << '~~~~~~~~~~~~~~~~~~~~~' << nl.
+                                                    finalTree inorder: [:char :string |
+                                                        stdout << '[' << char << ']=' << string << nl.
+                                                    ] prefix: ''.
                                                 "error handling below"
                                                 ] on: SystemExceptions.FileError do: [:signal |"unreadable file"
                                                     |errno|
