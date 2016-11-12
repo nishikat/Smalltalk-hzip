@@ -9,7 +9,7 @@ Character extend [
    ]
    visible [
       self isGraph ifTrue: [^ '$', self asString]
-                   ifFalse: [^ self asInteger printStringRadix: 16]
+                   ifFalse: [^ self asInteger "printStringRadix: 16"]
    ]
 ]
 ""
@@ -222,9 +222,26 @@ Smalltalk arguments size = 0
                                                     ].
                                                     finalTree := priority removeFirst.
                                                     stdout << nl << '~~~~~~~~~~~~~~~~~~~~~' << nl.
-                                                    finalTree inorder: [:char :string |
-                                                        stdout << '[' << char << ']=' << string << nl.
-                                                    ] prefix: ''.
+                                                    "printing tree with the 't' flag"
+                                                    (t) ifTrue:
+                                                        [finalTree inorder: [:char :string |
+                                                            | freqVal charPad freqPad |
+                                                            "char padding"
+                                                            charPad := ''.
+                                                            (char < 10) ifTrue: [ charPad := '  '. ].
+                                                            ((char >= 10 ) & (char < 100))  ifTrue: [ charPad := ' '. ].
+                                                            (char asCharacter isGraph) ifTrue: [charPad := ' '.].
+                                                            "freq value padding"
+                                                            freqVal := freqTable at: char.
+                                                            freqPad := ''.
+                                                            (freqVal < 10) ifTrue: [ freqPad := '    '.].
+                                                            ((freqVal >= 10 ) & (freqVal < 100))  ifTrue: [ freqPad := '   '. ].
+                                                            ((freqVal >= 100 ) & (freqVal < 1000))  ifTrue: [ freqPad := '  '. ].
+                                                            ((freqVal >= 1000 ) & (freqVal < 10000))  ifTrue: [ freqPad := ' '. ].
+                                                            "actual printing"
+                                                            stdout <<charPad << char asCharacter visible << ' |' <<  freqPad << freqVal << ' |' <<string << nl.
+                                                        ] prefix: ''.]
+                                                    ifFalse: [ stdout << ' c flag was used ' << nl. ].
                                                 "error handling below"
                                                 ] on: SystemExceptions.FileError do: [:signal |"unreadable file"
                                                     |errno|
