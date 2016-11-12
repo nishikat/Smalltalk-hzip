@@ -2,18 +2,7 @@
 
 
 execname := '$RCSfile: hzip.st,v $' =~ '.*: (.*),v.*' at: 1.
-FileStream extend [
-   nl := Character nl.
-   catFile [
-      |count|
-      count := 0.
-      [self atEnd not] whileTrue: [
-         count := count + 1.
-         count asString size to: 5 do: [:skip| stdout << ' '].
-         stdout << count << ': ' << self nextLine << nl.
-      ]
-   ]
-]
+""
 Character extend [
    isGraph [
       ^ (Character space < self) & (self <= $~)
@@ -23,23 +12,95 @@ Character extend [
                    ifFalse: [^ self asInteger printStringRadix: 16]
    ]
 ]
+""
+Object subclass: ZeroArray [
+   |theArray|
+
+   ZeroArray class >> new [
+      self shouldNotImplement.
+   ]
+
+   ZeroArray class >> new: size [
+      |result|
+      result := super new.
+      result init: size.
+      ^ result
+   ]
+
+   init: size [
+      theArray := Array new: size.
+   ]
+
+   size [
+      ^ theArray size.
+   ]
+
+   at: index [
+      ^ theArray at: index + 1.
+   ]
+
+   at: index put: value [
+      ^ theArray at: index + 1 put: value.
+   ]
+
+   incr: index [
+      (self at: index) isNil
+         ifTrue: [ self at: index put: 0].
+      self at: index put: (self at: index) + 1.
+   ]
+
+   keysAndValuesDo: aBlock [
+      (0 to: (self size) - 1) do: [:index |
+         aBlock value: index value: (self at: index).
+      ]
+   ]
+
+]
+""
+FileStream extend [
+   nl := Character nl.
+   catFile [
+      |count|
+      count := 0.
+      [self atEnd not] whileTrue: [
+         count := count + 1.
+         count asString size to: 5 do: [:skip| stdout << ' ']. "aligns space"
+         stdout << "count << ': ' <<" self nextLine << nl.
+      ]
+   ]
+   " freq [ :fTable |
+        [self atEnd not] whileTrue: [
+            |ordChar|
+            ordChar := self next asInteger.
+            fTable incr: ordChar.
+        ]
+   ] "
+]
+""
 nl := Character nl.
-"flags[[["
+
+|d t c u hasThird |
 d := false. "debug"
 t := false."print tree"
 c := false. "compress file"
 u := false. "uncompress file"
-"flags]]]"
-freqTable := Array new: 256.
+hasThird := false. "will use for output determination" 
 
+
+freqTable := ZeroArray new: 256.
+
+"flag checker"
 1 to: (Smalltalk arguments size) do: [:index | 
     arg:= (Smalltalk arguments at: index).
-        (arg includes: $-) ifTrue: [
-            (arg includes: $c) ifTrue: [c := true.].
-            (arg includes: $t) ifTrue: [t := true.].
-            (arg includes: $u) ifTrue: [u := true.].
-            (arg includes: $d) ifTrue: [d := true.].
-        ]
+    (index = 1) 
+        ifTrue:[
+            (arg includes: $-) ifTrue: [
+                (arg includes: $c) ifTrue: [c := true.].
+                (arg includes: $t) ifTrue: [t := true.].
+                (arg includes: $u) ifTrue: [u := true.].
+                (arg includes: $d) ifTrue: [d := true.].
+            ].
+        ].
 ].
         
         
@@ -52,38 +113,56 @@ Smalltalk arguments size = 0
                 ifFalse: [stdout << 'incompatible or incorrect number of arguments'<<nl.]
                 ifTrue: [
                     (c | t)
-                        ifTrue: ["compress" stdout<< 'Compress' << nl.]
-                        ifFalse: ["decompress" stdout<< 'Decompress' << nl.]
+                        ifTrue: ["compress" stdout<< 'Compress' << nl. "COMPRESSION START"
+                            Smalltalk arguments size = 1
+                                ifTrue: [ stdout << 'Missing file to read' << nl.]   
+                                ifFalse: [
+                                    1 to: (Smalltalk arguments size) do: [:index |
+                                        arg:= (Smalltalk arguments at: index).
+                                        "(index = 1) already taken care of"
+                                        (index = 2)
+                                            ifTrue: [
+                                                [
+                                                    |infile|
+                                                    infile := FileStream open: arg
+                                                                    mode: FileStream read.
+                                                    infile2 := FileStream open: arg
+                                                                    mode: FileStream read.
+                                                    infile2 catFile.
+                                                    infile2 close.
+                                                    [infile atEnd not] whileTrue: [
+                                                        |ordChar|
+                                                        ordChar := infile next asInteger.
+                                                        freqTable incr: ordChar.
+                                                    ].
+                                                    freqTable keysAndValuesDo: [:key :value |
+                                                    (value notNil and: [value > 0]) ifTrue: [
+                                            stdout << 'freq[' << key asCharacter visible << ']=' << value
+                                            << nl.
+                                                ]
+                                                ].
+                                                    infile close.
+                                                ] on: SystemExceptions.FileError do: [:signal |"unreadable file"
+                                                    |errno|
+                                                    errno := File errno.
+                                                    stdout flush.
+                                                    stderr << execname << ': ' << arg << ': '
+                                                            << signal messageText << nl.
+                                                    stderr flush.
+                                                ]
+                                            ].
+                                        (index = 3) 
+                                            ifTrue: [hasThird := true.].
+                                    ].
+                                ]
+                        ]
+                        ifFalse: ["decompress" stdout<< 'Decompress' << nl.] "DECOMPRESSION START"
                 ]
         ]
-"Smalltalk arguments size = 0
-   ifTrue: [stdout << 'need args (PRINT THIS TO STDERR??)' <<nl.] 
-   ifFalse: [
-   
-   
-      Smalltalk arguments do: [:filename |
-         |separator|
-         separator := '::::::::::::::::::::::::::::::::'.
-         stdout << separator << nl << filename << nl << separator << nl.
         
-         
-         filename = '-'
-            ifTrue: [stdin catFile]   
-            ifFalse: [
-               [
-                  |infile|
-                  infile := FileStream open: filename
-                                       mode: FileStream read.
-                  infile catFile.
-                  infile close.
-               ] on: SystemExceptions.FileError do: [:signal |
-                  |errno|
-                  errno := File errno.
-                  stdout flush.
-                  stderr << execname << ': ' << filename << ': '
-                         << signal messageText << nl.
-                  stderr flush.
-               ]
-            ]
-      ]
-   ]"
+"freqTable keysAndValuesDo: [:key :value |
+   (value notNil and: [value > 0]) ifTrue: [
+      stdout << 'freq[' << key asCharacter visible << ']=' << value
+             << nl.
+   ]
+]."
