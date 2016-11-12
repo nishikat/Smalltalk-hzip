@@ -158,6 +158,7 @@ hasThird := false. "will use for output determination"
 
 
 freqTable := ZeroArray new: 256.
+freqTable at: 255 put: 1. "End of File"
 priority := SortedCollection new.
 
 "flag checker"
@@ -194,7 +195,7 @@ Smalltalk arguments size = 0
                                         (index = 2)
                                             ifTrue: [
                                                 [
-                                                    |infile|
+                                                    | infile node1 node2 tree eofLeaf |
                                                     infile := FileStream open: arg
                                                                     mode: FileStream read.
                                                     "infile2 stuff is just for debug purposes"
@@ -208,18 +209,26 @@ Smalltalk arguments size = 0
                                                         freqTable incr: ordChar.
                                                     ].
                                                     infile close.
-                                                    "adding to sortedCollection"
+                                                    " adding to sortedCollection " 
                                                     freqTable keysAndValuesDo: [:key :value |
                                                         (value notNil and: [value > 0]) ifTrue: [
                                                             |leaf|
                                                             leaf := Leaf new: key count: value.
-                                                            priority add: leaf; inspect.
-                                                            "debug stuff"
-                                                            "stdout << 'freq[' << key asCharacter visible 
+                                                            priority add: leaf.
+                                                            " debug stuff "
+                                                           "stdout << 'freq[' << key asCharacter visible 
                                                                     << ']=' << value << nl."
                                                         ]
                                                     ].
-                                                 "error handling below"
+                                                    stdout << nl << '~~~~~~~~~~~~~~~~~~~~~' << nl.
+                                                    [(priority size) > 1] whileTrue: [ 
+                                                        node1 := priority removeFirst.
+                                                        node2 := priority removeFirst.
+                                                        tree := Tree new: (node1 char)  count: ((node1 count) + (node2 count)) left: node1 right: node2.
+                                                        priority add: tree; inspect. 
+                                                    ].
+                                                    
+                                                "error handling below"
                                                 ] on: SystemExceptions.FileError do: [:signal |"unreadable file"
                                                     |errno|
                                                     errno := File errno.
@@ -234,13 +243,7 @@ Smalltalk arguments size = 0
                                     ].
                                 ]
                         ]
-                        ifFalse: ["decompress" stdout<< 'Decompress' << nl.] "DECOMPRESSION START"
+                        ifFalse: ["decompress" stdout<< 'Decompress' << nl.]"DECOMPRESSION START"
                 ]
         ]
         
-"freqTable keysAndValuesDo: [:key :value |
-   (value notNil and: [value > 0]) ifTrue: [
-      stdout << 'freq[' << key asCharacter visible << ']=' << value
-             << nl.
-   ]
-]."
