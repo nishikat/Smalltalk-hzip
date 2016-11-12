@@ -77,6 +77,76 @@ FileStream extend [
    ] "
 ]
 ""
+Object subclass: Leaf [
+   |char count|
+   char [ ^ char ]
+   count [ ^ count ]
+
+   Leaf class >> new [
+      self shouldNotImplement
+   ]
+
+   Leaf class >> new: aChar count: aCount [
+      |result|
+      result := super new.
+      result setChar: aChar andCount: aCount.
+      ^result
+   ]
+
+   setChar: aChar andCount: aCount [
+      char := aChar.
+      count := aCount.
+   ]
+
+   <= other [
+      ^ (count < other count)
+      | ((count = other count) & (char <= other char))
+   ]
+
+   printBase: aStream [
+      ^ aStream << self class << '(' << char << ',' << count
+   ]
+
+   printOn: aStream [
+      (self printBase: aStream) << ')'.
+   ]
+
+   inorder: visitor prefix: string [
+      visitor value: char value: string.
+   ]
+
+]
+""
+Leaf subclass: Tree [
+   |left right|
+
+   Tree class >> new: aChar count: aCount [
+      self shouldNotImplement
+   ]
+
+   Tree class >> new: aChar count: aCount left: aLeft right: aRight [
+      |result|
+      result := super new: aChar count: aCount.
+      result setLeft: aLeft andRight: aRight.
+      ^ result
+   ]
+
+   setLeft: aLeft andRight: aRight [
+      left := aLeft.
+      right := aRight.
+   ]
+
+   printOn: aStream [
+      (self printBase: aStream) << ',' << left << ',' << right << ')'.
+   ]
+
+   inorder: visitor prefix: string [
+      left inorder: visitor prefix: string, '0'.
+      right inorder: visitor prefix: string, '1'.
+   ]
+
+]
+""
 nl := Character nl.
 
 |d t c u hasThird |
@@ -88,6 +158,7 @@ hasThird := false. "will use for output determination"
 
 
 freqTable := ZeroArray new: 256.
+priority := SortedCollection new.
 
 "flag checker"
 1 to: (Smalltalk arguments size) do: [:index | 
@@ -126,6 +197,7 @@ Smalltalk arguments size = 0
                                                     |infile|
                                                     infile := FileStream open: arg
                                                                     mode: FileStream read.
+                                                    "infile2 stuff is just for debug purposes"
                                                     infile2 := FileStream open: arg
                                                                     mode: FileStream read.
                                                     infile2 catFile.
@@ -135,13 +207,19 @@ Smalltalk arguments size = 0
                                                         ordChar := infile next asInteger.
                                                         freqTable incr: ordChar.
                                                     ].
-                                                    freqTable keysAndValuesDo: [:key :value |
-                                                    (value notNil and: [value > 0]) ifTrue: [
-                                            stdout << 'freq[' << key asCharacter visible << ']=' << value
-                                            << nl.
-                                                ]
-                                                ].
                                                     infile close.
+                                                    "adding to sortedCollection"
+                                                    freqTable keysAndValuesDo: [:key :value |
+                                                        (value notNil and: [value > 0]) ifTrue: [
+                                                            |leaf|
+                                                            leaf := Leaf new: key count: value.
+                                                            priority add: leaf; inspect.
+                                                            "debug stuff"
+                                                            "stdout << 'freq[' << key asCharacter visible 
+                                                                    << ']=' << value << nl."
+                                                        ]
+                                                    ].
+                                                 "error handling below"
                                                 ] on: SystemExceptions.FileError do: [:signal |"unreadable file"
                                                     |errno|
                                                     errno := File errno.
