@@ -198,39 +198,7 @@ Object subclass: OutBits [
       bitIndex = 0 ifTrue: [self flushByte].
    ]
 ]
-" Output of bitstream hello world."
-bitArray := #(
-   1 0 1 0   1 0 1 1
-   0 1 0 0   1 0 0 0
-   0 1 1 0   0 1 0 1
-   0 1 1 0   1 1 0 0
-   0 1 1 0   1 1 0 0
-   0 1 1 0   1 1 1 1
-   0 0 1 0   1 1 0 0
-   0 0 1 0   0 0 0 0
-   0 1 0 1   0 1 1 1
-   0 1 1 0   1 1 1 1
-   0 1 1 1   0 0 1 0
-   0 1 1 0   1 1 0 0
-   0 1 1 0   0 1 0 0
-   0 0 1 0   0 0 0 1
-   1 0 1 1   1 0 1 1
-   0 0 0 0   1 0 1 0
-   0 0 1 1   0 0 1 0
-   1 1 0 1   0 1 1 1
-   0 0 1 1   0 0 1 0
-   0 0 1 1   1 1 0 1
-   0 0 1 1   0 1 0 0
-   0 0 0 0   1 0 1 0
-).
 
-
-writeBitArray := [:outfile|
-   |outBytes|
-   outBytes := OutBits new: outfile.
-   bitArray do: [:bit| outBytes writeBit: bit]. "change this"
-   outBytes flushByte.
-].
 "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
 nl := Character nl.
 
@@ -240,12 +208,10 @@ t := false."print tree"
 c := false. "compress file"
 u := false. "uncompress file"
 
-
 freqTable := ZeroArray new: 257.
 codeTable := ZeroArray new: 257.
 freqTable at: 256 put: 1. "End of File"
 priority := SortedCollection new.
-
 "flag checker"
 1 to: (Smalltalk arguments size) do: [:index | 
     arg:= (Smalltalk arguments at: index).
@@ -258,10 +224,8 @@ priority := SortedCollection new.
                 (arg includes: $d) ifTrue: [d := true.].
             ].
         ].
-].
-        
-        
-Smalltalk arguments size = 0
+]. 
+(Smalltalk arguments size = 0)
         ifTrue: [stdout << 'need args (PRINT THIS TO STDERR??)' <<nl.] 
         ifFalse: [
             (d)
@@ -379,55 +343,52 @@ Smalltalk arguments size = 0
                                             ifFalse: [ "print to file"
                                                 |outfilename|
                                                 outfilename := Smalltalk arguments at: 3.
-                                                [  | outfile outBytes coll |
+                                                [  | outfile outBytes coll tmp ind infile count |
                                                     coll := OrderedCollection new.
                                                     outfile := FileStream open: outfilename mode: FileStream write.
                                                     outBytes := OutBits new: outfile.
-                                                    "AAAAAAAAAAAAAAAA"
-                                                    [ | tmp ind infile count |
-                                                        count := 0.
-                                                        finalTree postorder: [:char |
-                                                            ind := 9. 
-                                                            tmp := char asInteger.
-                                                            (char isString)
-                                                                ifTrue:[ ind := 1 ].
-                                                            (char = 256) "chars start at 0"
-                                                                ifTrue: [ ind := 10.  tmp := 1].
-                                                            (char = 0)
-                                                                ifTrue: [ ind := 10.  tmp := 0].
-                                                            [ind > 0] whileTrue: [
-                                                                outBytes writeBit: (tmp bitAt: ind). 
-                                                                ind:= ind - 1.
-                                                                count := count + 1.
-                                                                ].
+                                                    "stdout<< 'something' << nl."
+                                                    count := 0.
+                                                    finalTree postorder: [:char |
+                                                        ind := 9. 
+                                                        tmp := char asInteger.
+                                                        (char isString)
+                                                            ifTrue:[ ind := 1 ].
+                                                        (char = 256) "chars start at 0"
+                                                            ifTrue: [ ind := 10.  tmp := 1].
+                                                        (char = 0)
+                                                            ifTrue: [ ind := 10.  tmp := 0].
+                                                        [ind > 0] whileTrue: [
+                                                            outBytes writeBit: (tmp bitAt: ind). "!!!!!!!!!"
+                                                            ind:= ind - 1.
+                                                            count := count + 1.
                                                         ].
+                                                    ].
                                                         infile := FileStream open: arg
                                                                     mode: FileStream read.
                                                         [infile atEnd not] whileTrue: [
                                                             | ckey outp tmp2|
                                                             ckey := infile next asInteger.
-                                                            outp := codeTable at: ckey asString. 
+                                                            outp := (codeTable at: ckey) asString. 
                                                             1 to: (outp size) do: [:index |
-                                                                tmp2 := outp at: index asInteger.
-                                                                outBytes writeBit: tmp2.
+                                                                tmp2 := (outp at: index) asInteger .
+                                                                outBytes writeBit: tmp2. "!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
                                                             ].
                                                             count := count + (outp size).
                                                         ].
                                                         infile close.
-                                                        tmp := codeTable at: 256 asString.
+                                                        tmp := (codeTable at: 256) asString.
                                                         count := count + (tmp size).
                                                         1 to: (tmp size) do: [:index |
-                                                                ind := tmp at: index asInteger.
-                                                                outBytes writeBit: ind.
+                                                                ind := (tmp at: index) asInteger.
+                                                                outBytes writeBit: ind. "!!!!!!!!!!!!!!!!!!!!!!!"
                                                             ].
                                                         "padding with zeros"
                                                         [((count \\ 8)= 0) not] whileTrue: [
                                                             count := count + 1.
                                                             outBytes writeBit: 0.
                                                         ].
-                                                        writeBitArray value: outfile. 
-                                                    ].
-                                                    "BBBBBBBBBBBBBBBB"
+                                                        "writeBitArray value: outfile."  "BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB"
                                                     outBytes flushByte.
                                                     outfile close.
                                                 ] on: SystemExceptions.FileError do: [:signal |
