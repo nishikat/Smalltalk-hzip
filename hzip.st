@@ -58,7 +58,25 @@ Object subclass: ZeroArray [
 ]
 ""
 FileStream extend [
-   nl := Character nl.
+    |bitIndex currentChar|
+    nl := Character nl.
+
+   nextBit [
+      |bit|
+      bitIndex isNil ifTrue: [bitIndex := 0].
+      bitIndex = 0 ifTrue: [
+         bitIndex := 8.
+         currentChar := self next.
+      ].
+      bit := currentChar value bitAt: bitIndex.
+      bitIndex := bitIndex - 1.
+      ^ bit
+   ]
+
+   atBitEnd [
+      ^ (bitIndex isNil | (bitIndex = 0)) & self atEnd
+   ]
+   
    catFile [
       |count|
       count := 0.
@@ -107,12 +125,16 @@ Object subclass: Leaf [
    inorder: visitor prefix: string [
       visitor value: char value: string.
    ]
-
+    postorder: visitor [
+        visitor value: (char asInteger).
+    ]
 ]
 ""
 Leaf subclass: Tree [
    |left right|
-
+    left [^left]
+    right [^right]
+    
    Tree class >> new: aChar count: aCount [
       self shouldNotImplement
    ]
@@ -138,6 +160,43 @@ Leaf subclass: Tree [
       right inorder: visitor prefix: string, '1'.
    ]
 
+   postorder: visitor [
+        left postorder: visitor.
+        right postorder: visitor.
+        visitor value: (1 asString)
+   ]
+]
+""
+Object subclass: OutBits [
+   |bitIndex currentByte myStream|
+   OutBits class >> new [
+      self shouldNotImplement.
+   ]
+   OutBits class >> new: fileStream [
+      |result|
+      result := super new.
+      result init: fileStream.
+      ^result
+   ]
+   clearByte [
+      bitIndex := 8.
+      currentByte := 0.
+   ]
+   init: fileStream [
+      myStream := fileStream.
+      self clearByte.
+   ]
+   flushByte [
+      bitIndex = 8 ifFalse: [
+         myStream nextPutByte: currentByte.
+         self clearByte.
+      ]
+   ]
+   writeBit: bit [
+      currentByte := currentByte bitAt: bitIndex put: bit.
+      bitIndex := bitIndex - 1.
+      bitIndex = 0 ifTrue: [self flushByte].
+   ]
 ]
 ""
 nl := Character nl.
@@ -150,8 +209,9 @@ u := false. "uncompress file"
 hasThird := false. "will use for output determination" 
 
 
-freqTable := ZeroArray new: 256.
-freqTable at: 255 put: 1. "End of File"
+freqTable := ZeroArray new: 257.
+codeTable := ZeroArray new: 257.
+freqTable at: 256 put: 1. "End of File"
 priority := SortedCollection new.
 
 "flag checker"
@@ -178,7 +238,7 @@ Smalltalk arguments size = 0
                 ifFalse: [stdout << 'incompatible or incorrect number of arguments'<<nl.]
                 ifTrue: [
                     (c | t)
-                        ifTrue: ["compress" stdout<< 'Compress' << nl. "COMPRESSION START"
+                        ifTrue: ["compress" "stdout<< 'Compress' << nl." "COMPRESSION START"
                             Smalltalk arguments size = 1
                                 ifTrue: [ stdout << 'Missing file to read' << nl.]   
                                 ifFalse: [
@@ -222,8 +282,13 @@ Smalltalk arguments size = 0
                                                     ].
                                                     finalTree := priority removeFirst.
                                                     stdout << nl << '~~~~~~~~~~~~~~~~~~~~~' << nl.
+                                                    "filling code array"
+                                                    finalTree inorder: [:char :string |
+                                                        codeTable at: (char asInteger) put: string.
+                                                        ] prefix: ''.
                                                     "printing tree with the 't' flag"
                                                     (t) ifTrue:
+                                                         "**** CHANGE THIS SO THAT WE USE CODE ARRAY ****"
                                                         [finalTree inorder: [:char :string |
                                                             | freqVal charPad freqPad |
                                                             "char padding"
@@ -241,7 +306,50 @@ Smalltalk arguments size = 0
                                                             "actual printing"
                                                             stdout <<charPad << char asCharacter visible << ' |' <<  freqPad << freqVal << ' |' <<string << nl.
                                                         ] prefix: ''.]
-                                                    ifFalse: [ stdout << ' c flag was used ' << nl. ].
+                                                    "c flag handling"
+                                                    ifFalse: [ 
+                                                        | tmp ind infile count |
+                                                        "stdout << ' c flag was used ' << nl. "
+                                                        count := 0.
+                                                        finalTree postorder: [:char |
+                                                            ind := 9. 
+                                                            tmp := char asInteger.
+                                                            (char isString)
+                                                                ifTrue:[ ind := 1 ].
+                                                            (char = 256) "chars start at 0"
+                                                                ifTrue: [ ind := 10.  tmp := 1].
+                                                            (char = 0)
+                                                                ifTrue: [ ind := 10.  tmp := 0].
+                                                            "~char not one of the above opts"
+                                                            [ind > 0] whileTrue: [
+                                                                stdout << (tmp bitAt: ind) .
+                                                                ind:= ind - 1.
+                                                                count := count + 1.
+                                                                ].
+                                                            stdout << '\'.
+                                                                
+                                                        ].
+                                                        stdout << '||'<<count << '||'.
+                                                        infile := FileStream open: arg
+                                                                    mode: FileStream read.
+                                                        [infile atEnd not] whileTrue: [
+                                                            | ckey outp |
+                                                            ckey := infile next asInteger.
+                                                            outp := codeTable at: ckey asInteger.
+                                                            stdout << outp << '\'.
+                                                            count := count + (outp asString size).
+                                                        ].
+                                                        infile close.
+                                                        tmp := codeTable at: 256 asInteger.
+                                                        count := count + (tmp asString size).
+                                                        stdout << tmp << '\\' << count << '\\'.
+                                                        "padding with zeros"
+                                                        [((count \\ 8)= 0) not] whileTrue: [
+                                                            count := count + 1.
+                                                            stdout << 0.
+                                                        ].
+                                                        stdout << nl << count << nl.
+                                                    ].
                                                 "error handling below"
                                                 ] on: SystemExceptions.FileError do: [:signal |"unreadable file"
                                                     |errno|
