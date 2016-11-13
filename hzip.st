@@ -198,15 +198,47 @@ Object subclass: OutBits [
       bitIndex = 0 ifTrue: [self flushByte].
    ]
 ]
-""
+" Output of bitstream hello world."
+bitArray := #(
+   1 0 1 0   1 0 1 1
+   0 1 0 0   1 0 0 0
+   0 1 1 0   0 1 0 1
+   0 1 1 0   1 1 0 0
+   0 1 1 0   1 1 0 0
+   0 1 1 0   1 1 1 1
+   0 0 1 0   1 1 0 0
+   0 0 1 0   0 0 0 0
+   0 1 0 1   0 1 1 1
+   0 1 1 0   1 1 1 1
+   0 1 1 1   0 0 1 0
+   0 1 1 0   1 1 0 0
+   0 1 1 0   0 1 0 0
+   0 0 1 0   0 0 0 1
+   1 0 1 1   1 0 1 1
+   0 0 0 0   1 0 1 0
+   0 0 1 1   0 0 1 0
+   1 1 0 1   0 1 1 1
+   0 0 1 1   0 0 1 0
+   0 0 1 1   1 1 0 1
+   0 0 1 1   0 1 0 0
+   0 0 0 0   1 0 1 0
+).
+
+
+writeBitArray := [:outfile|
+   |outBytes|
+   outBytes := OutBits new: outfile.
+   bitArray do: [:bit| outBytes writeBit: bit]. "change this"
+   outBytes flushByte.
+].
+"~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
 nl := Character nl.
 
-|d t c u hasThird |
+|d t c u |
 d := false. "debug"
 t := false."print tree"
 c := false. "compress file"
 u := false. "uncompress file"
-hasThird := false. "will use for output determination" 
 
 
 freqTable := ZeroArray new: 257.
@@ -242,74 +274,117 @@ Smalltalk arguments size = 0
                             Smalltalk arguments size = 1
                                 ifTrue: [ stdout << 'Missing file to read' << nl.]   
                                 ifFalse: [
-                                    1 to: (Smalltalk arguments size) do: [:index |
-                                        arg:= (Smalltalk arguments at: index).
-                                        "(index = 1) already taken care of"
-                                        (index = 2)
-                                            ifTrue: [
-                                                [
-                                                    | infile node1 node2 tree finalTree |
-                                                    infile := FileStream open: arg
-                                                                    mode: FileStream read.
-                                                    "infile2 stuff is just for debug purposes"
-                                                    infile2 := FileStream open: arg
-                                                                    mode: FileStream read.
-                                                    infile2 catFile.
-                                                    infile2 close.
-                                                    [infile atEnd not] whileTrue: [
-                                                        |ordChar|
-                                                        ordChar := infile next asInteger.
-                                                        freqTable incr: ordChar.
-                                                    ].
-                                                    infile close.
-                                                    " adding to sortedCollection " 
-                                                    freqTable keysAndValuesDo: [:key :value |
-                                                        (value notNil and: [value > 0]) ifTrue: [
-                                                            |leaf|
-                                                            leaf := Leaf new: key count: value.
-                                                            priority add: leaf.
-                                                            " debug stuff "
-                                                           "stdout << 'freq[' << key asCharacter visible 
-                                                                    << ']=' << value << nl."
-                                                        ]
-                                                    ].
-                                                    stdout << nl << '~~~~~~~~~~~~~~~~~~~~~' << nl.
-                                                    [(priority size) > 1] whileTrue: [ 
-                                                        node1 := priority removeFirst.
-                                                        node2 := priority removeFirst.
-                                                        tree := Tree new: (node1 char)  count: ((node1 count) + (node2 count)) left: node1 right: node2.
-                                                        priority add: tree. 
-                                                    ].
-                                                    finalTree := priority removeFirst.
-                                                    stdout << nl << '~~~~~~~~~~~~~~~~~~~~~' << nl.
-                                                    "filling code array"
-                                                    finalTree inorder: [:char :string |
-                                                        codeTable at: (char asInteger) put: string.
-                                                        ] prefix: ''.
-                                                    "printing tree with the 't' flag"
-                                                    (t) ifTrue:
-                                                         "**** CHANGE THIS SO THAT WE USE CODE ARRAY ****"
-                                                        [finalTree inorder: [:char :string |
-                                                            | freqVal charPad freqPad |
-                                                            "char padding"
-                                                            charPad := ''.
-                                                            (char < 10) ifTrue: [ charPad := '  '. ].
-                                                            ((char >= 10 ) & (char < 100))  ifTrue: [ charPad := ' '. ].
-                                                            (char asCharacter isGraph) ifTrue: [charPad := ' '.].
-                                                            "freq value padding"
-                                                            freqVal := freqTable at: char.
-                                                            freqPad := ''.
-                                                            (freqVal < 10) ifTrue: [ freqPad := '    '.].
-                                                            ((freqVal >= 10 ) & (freqVal < 100))  ifTrue: [ freqPad := '   '. ].
-                                                            ((freqVal >= 100 ) & (freqVal < 1000))  ifTrue: [ freqPad := '  '. ].
-                                                            ((freqVal >= 1000 ) & (freqVal < 10000))  ifTrue: [ freqPad := ' '. ].
-                                                            "actual printing"
-                                                            stdout <<charPad << char asCharacter visible << ' |' <<  freqPad << freqVal << ' |' <<string << nl.
-                                                        ] prefix: ''.]
-                                                    "c flag handling"
-                                                    ifFalse: [ 
-                                                        | tmp ind infile count |
-                                                        "stdout << ' c flag was used ' << nl. "
+                                    arg:= (Smalltalk arguments at: 2).
+                                    [
+                                        | infile node1 node2 tree finalTree |
+                                        infile := FileStream open: arg
+                                                        mode: FileStream read.
+                                        "infile2 stuff is just for debug purposes"
+                                        "infile2 := FileStream open: arg
+                                                        mode: FileStream read.
+                                        infile2 catFile.
+                                        infile2 close."
+                                        [infile atEnd not] whileTrue: [
+                                            |ordChar|
+                                            ordChar := infile next asInteger.
+                                            freqTable incr: ordChar.
+                                        ].
+                                        infile close.
+                                        " adding to sortedCollection " 
+                                        freqTable keysAndValuesDo: [:key :value |
+                                            (value notNil and: [value > 0]) ifTrue: [
+                                                |leaf|
+                                                leaf := Leaf new: key count: value.
+                                                priority add: leaf.
+                                                " debug stuff "
+                                               "stdout << 'freq[' << key asCharacter visible 
+                                                        << ']=' << value << nl."
+                                            ]
+                                        ].
+                                        "stdout << nl << '~~~~~~~~~~~~~~~~~~~~~' << nl."
+                                        [(priority size) > 1] whileTrue: [ 
+                                            node1 := priority removeFirst.
+                                            node2 := priority removeFirst.
+                                            tree := Tree new: (node1 char)  count: ((node1 count) + (node2 count)) left: node1 right: node2.
+                                            priority add: tree. 
+                                        ].
+                                        finalTree := priority removeFirst.
+                                        "stdout << nl << '~~~~~~~~~~~~~~~~~~~~~' << nl."
+                                        "filling code array"
+                                        finalTree inorder: [:char :string |
+                                            codeTable at: (char asInteger) put: string.
+                                            ] prefix: ''.
+                                        "printing tree with the 't' flag"
+                                        (t) ifTrue:
+                                             "**** CHANGE THIS SO THAT WE USE CODE ARRAY ****"
+                                            [finalTree inorder: [:char :string |
+                                                | freqVal charPad freqPad |
+                                                "char padding"
+                                                charPad := ''.
+                                                (char < 10) ifTrue: [ charPad := '  '. ].
+                                                ((char >= 10 ) & (char < 100))  ifTrue: [ charPad := ' '. ].
+                                                (char asCharacter isGraph) ifTrue: [charPad := ' '.].
+                                                "freq value padding"
+                                                freqVal := freqTable at: char.
+                                                freqPad := ''.
+                                                (freqVal < 10) ifTrue: [ freqPad := '    '.].
+                                                ((freqVal >= 10 ) & (freqVal < 100))  ifTrue: [ freqPad := '   '. ].
+                                                ((freqVal >= 100 ) & (freqVal < 1000))  ifTrue: [ freqPad := '  '. ].
+                                                ((freqVal >= 1000 ) & (freqVal < 10000))  ifTrue: [ freqPad := ' '. ].
+                                                "actual printing"
+                                                stdout <<charPad << char asCharacter visible << ' |' <<  freqPad << freqVal << ' |' <<string << nl.
+                                            ] prefix: ''.]
+                                        "c flag handling"
+                                        ifFalse: [ 
+                                            (Smalltalk arguments size = 2)
+                                            ifTrue: [ "print to stdout"
+                                                | tmp ind infile count |
+                                                count := 0.
+                                                finalTree postorder: [:char |
+                                                    ind := 9. 
+                                                    tmp := char asInteger.
+                                                    (char isString)
+                                                        ifTrue:[ ind := 1 ].
+                                                    (char = 256) "chars start at 0"
+                                                        ifTrue: [ ind := 10.  tmp := 1].
+                                                    (char = 0)
+                                                        ifTrue: [ ind := 10.  tmp := 0].
+                                                    [ind > 0] whileTrue: [
+                                                        stdout << (tmp bitAt: ind) .
+                                                        ind:= ind - 1.
+                                                        count := count + 1.
+                                                        ].
+                                                ].
+                                                infile := FileStream open: arg
+                                                            mode: FileStream read.
+                                                [infile atEnd not] whileTrue: [
+                                                    | ckey outp |
+                                                    ckey := infile next asInteger.
+                                                    outp := codeTable at: ckey asInteger.
+                                                    stdout << outp "<< '\'".
+                                                    count := count + (outp asString size).
+                                                ].
+                                                infile close.
+                                                tmp := codeTable at: 256 asInteger.
+                                                count := count + (tmp asString size).
+                                                stdout << tmp.
+                                                "padding with zeros"
+                                                [((count \\ 8)= 0) not] whileTrue: [
+                                                    count := count + 1.
+                                                    stdout << 0.
+                                                ].
+                                                stdout << nl 
+                                            ].
+                                            (Smalltalk arguments size = 2)
+                                            ifFalse: [ "print to file"
+                                                |outfilename|
+                                                outfilename := Smalltalk arguments at: 3.
+                                                [  | outfile outBytes coll |
+                                                    coll := OrderedCollection new.
+                                                    outfile := FileStream open: outfilename mode: FileStream write.
+                                                    outBytes := OutBits new: outfile.
+                                                    "AAAAAAAAAAAAAAAA"
+                                                    [ | tmp ind infile count |
                                                         count := 0.
                                                         finalTree postorder: [:char |
                                                             ind := 9. 
@@ -320,50 +395,61 @@ Smalltalk arguments size = 0
                                                                 ifTrue: [ ind := 10.  tmp := 1].
                                                             (char = 0)
                                                                 ifTrue: [ ind := 10.  tmp := 0].
-                                                            "~char not one of the above opts"
                                                             [ind > 0] whileTrue: [
-                                                                stdout << (tmp bitAt: ind) .
+                                                                outBytes writeBit: (tmp bitAt: ind). 
                                                                 ind:= ind - 1.
                                                                 count := count + 1.
                                                                 ].
-                                                            stdout << '\'.
-                                                                
                                                         ].
-                                                        stdout << '||'<<count << '||'.
                                                         infile := FileStream open: arg
                                                                     mode: FileStream read.
                                                         [infile atEnd not] whileTrue: [
-                                                            | ckey outp |
+                                                            | ckey outp tmp2|
                                                             ckey := infile next asInteger.
-                                                            outp := codeTable at: ckey asInteger.
-                                                            stdout << outp << '\'.
-                                                            count := count + (outp asString size).
+                                                            outp := codeTable at: ckey asString. 
+                                                            1 to: (outp size) do: [:index |
+                                                                tmp2 := outp at: index asInteger.
+                                                                outBytes writeBit: tmp2.
+                                                            ].
+                                                            count := count + (outp size).
                                                         ].
                                                         infile close.
-                                                        tmp := codeTable at: 256 asInteger.
-                                                        count := count + (tmp asString size).
-                                                        stdout << tmp << '\\' << count << '\\'.
+                                                        tmp := codeTable at: 256 asString.
+                                                        count := count + (tmp size).
+                                                        1 to: (tmp size) do: [:index |
+                                                                ind := tmp at: index asInteger.
+                                                                outBytes writeBit: ind.
+                                                            ].
                                                         "padding with zeros"
                                                         [((count \\ 8)= 0) not] whileTrue: [
                                                             count := count + 1.
-                                                            stdout << 0.
+                                                            outBytes writeBit: 0.
                                                         ].
-                                                        stdout << nl << count << nl.
+                                                        writeBitArray value: outfile. 
                                                     ].
-                                                "error handling below"
-                                                ] on: SystemExceptions.FileError do: [:signal |"unreadable file"
+                                                    "BBBBBBBBBBBBBBBB"
+                                                    outBytes flushByte.
+                                                    outfile close.
+                                                ] on: SystemExceptions.FileError do: [:signal |
                                                     |errno|
                                                     errno := File errno.
                                                     stdout flush.
-                                                    stderr << execname << ': ' << arg << ': '
+                                                    stderr << execname << ': ' << filename << ': '
                                                             << signal messageText << nl.
                                                     stderr flush.
                                                 ]
                                             ].
-                                        (index = 3) 
-                                            ifTrue: [hasThird := true.].
+                                        ].
+                                    "error handling below"
+                                    ] on: SystemExceptions.FileError do: [:signal |"unreadable file"
+                                        |errno|
+                                        errno := File errno.
+                                        stdout flush.
+                                        stderr << execname << ': ' << arg << ': '
+                                                << signal messageText << nl.
+                                        stderr flush.
                                     ].
-                                ]
+                                ].
                         ]
                         ifFalse: ["decompress" stdout<< 'Decompress' << nl.]"DECOMPRESSION START"
                 ]
