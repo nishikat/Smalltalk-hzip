@@ -251,6 +251,11 @@ ifFalse: [
             (Smalltalk arguments size = 1)
             ifTrue: [ stdout << 'Missing file to read' << nl.]   
             ifFalse: [
+                "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
+            
+                "         (-c or -t)    Compression  or table          "
+            
+                "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
                 arg:= (Smalltalk arguments at: 2).
                 [
                     | infile node1 node2 tree finalTree |
@@ -273,9 +278,16 @@ ifFalse: [
                     [(priority size) > 1] whileTrue: [ 
                         node1 := priority removeFirst.
                         node2 := priority removeFirst.
+                        "(node1 isLeaf) ifTrue: ["
                         tree := Tree new: (node1 char)  
                             count: ((node1 count) + (node2 count)) 
                             left: node1 right: node2.
+                        "]
+                        ifFalse: [
+                            tree := Tree new: (node2 char)  
+                                count: ((node2 count) + (node1 count)) 
+                                left: node2 right: node1.
+                        ]"
                         priority add: tree. 
                     ].
                     finalTree := priority removeFirst.
@@ -285,6 +297,12 @@ ifFalse: [
                     ] prefix: ''.
                         "printing tree with the 't' flag"
                     (t) ifTrue:
+                    "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
+            
+                    "               (-t)    frequency table          "
+            
+                    "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
+                    
                         [finalTree inorder: [:char :string |
                             | freqVal charPad freqPad |
                                 "char padding"
@@ -314,9 +332,19 @@ ifFalse: [
                         ] prefix: ''.]
                         "c flag handling"
                     ifFalse: [ 
+                    "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
+            
+                    "            (-c)    Compression                   "
+            
+                    "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
                         (Smalltalk arguments size = 2)
                         ifTrue: [ "print to stdout"
                             | tmp ind infile count |
+                            (finalTree isLeaf)
+                            ifTrue: [
+                                "empty file"
+                                ObjectMemory quit
+                            ].
                             count := 0.
                             finalTree postorder: [:char |
                                 ind := 9. 
@@ -363,6 +391,12 @@ ifFalse: [
                             outBytes := OutBits new: outfile.
                                 "stdout<< 'something' << nl."
                             count := 0.
+                            (finalTree isLeaf)
+                            ifTrue: [
+                            "empty file"
+                            outfile close.
+                            ObjectMemory quit
+                            ].
                             finalTree postorder: [:char |
                                 ind := 9. 
                                 tmp := char asInteger.
@@ -429,6 +463,11 @@ ifFalse: [
             ].
         ]
         ifFalse: ["decompress" 
+            "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
+            
+            "               (-u)    Decompression                     "
+            
+            "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
             (Smalltalk arguments size = 1)
             ifTrue: [ stdout << 'Missing file to read' << nl.]
             ifFalse: [
@@ -437,23 +476,60 @@ ifFalse: [
                     | infile bitColl acc acc2 turns counter 
                     treeStack bitCollCopy node1 node2 
                     tree finalTree isDone printColl |
+                    
+                    "file specified to read"
                     infile := FileStream open: arg
                                     mode: FileStream read.
-                    bitColl := OrderedCollection new.           
-                    treeStack := OrderedCollection new. 
+                    "collection of bits"
+                    bitColl := OrderedCollection new.
+                    "stack where a tree will be built"
+                    treeStack := OrderedCollection new.
+                    "collection of characters to print"
                     printColl := OrderedCollection new. 
-                    "collecting bits"
+                    
+                    "collecting bits (below)"
                     [infile atBitEnd not] whileTrue: [
                         | singleBit |
                         singleBit := infile nextBit.
-                        "stdout << singleBit."
                         bitColl add: singleBit.
                     ].
                     infile close.
                     
                     
-                    turns := 1. 
-                    [turns > 0] whileTrue: [
+                    "displaying collected bits "
+                    "bitColl do: [:char |
+                        stdout << char 
+                    ].
+                    stdout<<nl<<'~~~~~~~~~~~~~~~~~~~'<<nl."
+                    
+                    ((bitColl size ) < 9)
+                    ifTrue: [
+                        (Smalltalk arguments size = 3)
+                        ifTrue: [
+                        |outfilename|
+                        outfilename := Smalltalk arguments at: 3.
+                        [  | outfile outBytes coll 
+                            tmp ind infile count |
+                            outfile := FileStream 
+                                    open: outfilename 
+                                    mode: FileStream write.
+                            outfile close.
+                        ] on: SystemExceptions.FileError 
+                            do: [:signal |
+                            |errno|
+                            errno := File errno.
+                            stdout flush.
+                            stderr << execname << ': ' 
+                                    << filename << ': '
+                                    << signal messageText << nl.
+                            stderr flush.
+                        ]
+                        ].
+                        ObjectMemory quit.
+                    ].
+                    
+                    "turns := 1. 
+                    [ turns > 0 ] whileTrue: ["
                         acc := (bitColl removeFirst) asInteger.
                         acc := 0.
                         counter := 8.
@@ -469,19 +545,27 @@ ifFalse: [
                                 (acc2 = 0)
                                     ifTrue: [ counter := 0 ]
                                     ifFalse: [ counter := 256 ].
+                                "stdout << finalTree <<nl. "
+                                
                                 finalTree := Leaf new: counter count: 0.
                             ]
                             ifFalse:[
                                 finalTree := Leaf new: acc count: 0.
                             ].
-                        turns := turns - 1. 
-                    ].
+                        "turns := turns - 1. 
+                    ]."
                     "now working on deciphering rest of the tree"
+                    
+                    
                     isDone := false.
                     [isDone not ] whileTrue: [  
                         treeStack add: finalTree.
                         
+                        
                         acc := (bitColl removeFirst) asInteger.
+                        
+                        
+                        
                         (acc = 0) ifTrue: [
                             acc := 0.
                             counter := 8.
@@ -492,6 +576,7 @@ ifFalse: [
                                 acc:= (acc bitAt: counter put: acc2).
                                 counter:= counter - 1.
                             ].
+                            
                             "stdout << '='<<acc << nl."
                             (acc = 0) 
                             ifTrue: [
@@ -506,15 +591,17 @@ ifFalse: [
                                 node1 := Leaf new: acc count: 0.
                             ].
                             treeStack add: node1.
-                            turns := turns - 1. 
+                            "turns := turns - 1. "
                         ].
-                        (acc = 1) ifTrue: [
+                        (acc = 1 & ((treeStack size) > 1 )) ifTrue: [
                             node2 := treeStack removeLast.
                             node1 := treeStack removeLast.
                             tree := Tree new: (node1 char ) 
                                     count: 0 left: node1 right: node2.
                             treeStack add: tree.
                         ].
+                        
+                        "stdout << '[' << bitColl << ']'."
                         
                         [treeStack size > 1] whileTrue: [
                             acc := (bitColl removeFirst) asInteger.
@@ -528,6 +615,7 @@ ifFalse: [
                                         (acc bitAt: counter put: acc2).
                                     counter:= counter - 1.
                                 ].
+                                
                                 "stdout << acc << nl."
                                 (acc = 0) 
                                 ifTrue: [
@@ -536,13 +624,17 @@ ifFalse: [
                                     (acc2 = 0)
                                         ifTrue: [ counter := 0 ]
                                         ifFalse: [ counter := 256 ].
-                                    node1 := Leaf new: counter count: 0.
+                                    node1 := 
+                                        Leaf new: (counter asInteger) 
+                                        count: 0.
                                 ]
                                 ifFalse:[
-                                    node1 := Leaf new: acc count: 0.
+                                    node1 := 
+                                        Leaf new: (acc asInteger) 
+                                        count: 0.
                                 ].
                                 treeStack add: node1.
-                                turns := turns - 1. 
+                                "turns := turns - 1. "
                             ].
                             (acc = 1) ifTrue: [
                                 node2 := treeStack removeLast.
@@ -552,28 +644,33 @@ ifFalse: [
                                 treeStack add: tree.
                             ].
                         ].
-                        
                         "work on copy in case we need to fix things"
                         bitCollCopy := bitColl. 
                         finalTree := treeStack removeLast.
                             "filling code array"
                         finalTree inorder: [:char :string | 
-                            codeTable at: char put: 1.
+                            codeTable at: (char asInteger) put: 1.
                         ] prefix: ''.
                         
                         acc := ''.
                         isDone := false.
                         tree:=  finalTree.
+                        "stdout << nl << nl<<printColl << nl."
+                        printColl := OrderedCollection new.
+                        "stdout << nl <<'    Is this a loop???? '<<nl."
                         bitCollCopy do: [ :singleBit |
                             (isDone) ifFalse: [
-                                acc := acc, (singleBit asString).
+                                acc := 
+                                    (acc asString),(singleBit asString).
                                 
                                 ((singleBit asInteger) = 0) 
                                 ifTrue:[ tree := tree left.]
                                 ifFalse: [ tree:= tree right.].
                                 (tree isLeaf) 
                                 ifTrue: [
-                                    printColl add: (tree char).
+                                 printColl add: ((tree char) asInteger).
+                                    "stdout << ((tree char) asInteger) 
+                                    << '  '."
                                     codeTable 
                                         at: ((tree char) asInteger) 
                                         put: 0.
@@ -587,19 +684,27 @@ ifFalse: [
                             ].
                                 
                         ].
+                        "stdout << nl << nl<<printColl << nl."
                         codeTable keysAndValuesDo: [:keys :value |
-                            (value notNil and: [value > 0]) ifTrue: [
+                            (value notNil and: [(value asInteger)> 0]) 
+                            ifTrue: [
                                 isDone := false. 
+                                
                                 printColl := OrderedCollection new.
                             ]
-                        ].
+                        ]."stdout <<'[[[' << isDone << ']]]' ."
                     ].
                     
+                    "stdout << nl << nl<<printColl << nl."
                     "printing converted code"
                     (Smalltalk arguments size = 2)
                         ifTrue: [ "print to stdout"
+                            |skip|
+                            skip := false. 
                             printColl do: [ :char |
-                                (char = 256) ifTrue: [stdout << nl.]
+                                ((char asInteger)= 256) 
+                                ifTrue: [skip := true.].
+                                (skip) "skip once we have eof"
                                 ifFalse: [ 
                                     stdout << (char asCharacter).
                                 ]
@@ -611,14 +716,16 @@ ifFalse: [
                             
                             |outfilename|
                             outfilename := Smalltalk arguments at: 3.
-                            [  | outfile outBytes coll 
+                            [  | outfile outBytes coll skip
                                 tmp ind infile count |
                                 outfile := FileStream 
                                         open: outfilename 
                                         mode: FileStream write.
-                                
+                                skip := false.
                                 printColl do: [ :char |
-                                    (char = 256) 
+                                    ((char asInteger) = 256) 
+                                    ifTrue: [skip := true].
+                                    (skip)
                                     ifFalse: [ 
                                         outfile 
                                             nextPut: (char asCharacter) 
