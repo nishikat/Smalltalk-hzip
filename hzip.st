@@ -128,6 +128,9 @@ Object subclass: Leaf [
     postorder: visitor [
         visitor value: (char asInteger).
     ]
+    isLeaf [
+        ^true.
+    ]
 ]
 ""
 Leaf subclass: Tree [
@@ -164,6 +167,10 @@ Leaf subclass: Tree [
         left postorder: visitor.
         right postorder: visitor.
         visitor value: (1 asString)
+   ]
+   
+   isLeaf [
+        ^false.
    ]
 ]
 ""
@@ -272,6 +279,7 @@ priority := SortedCollection new.
                                         tree := Tree new: (node1 char)  count: ((node1 count) + (node2 count)) left: node1 right: node2.
                                         priority add: tree. 
                                     ].
+                                    stdout << priority <<nl. "REMOVE THIS DEBUG THING"
                                     finalTree := priority removeFirst.
                                         "stdout << nl << '~~~~~~~~~~~~~~~~~~~~~' << nl."
                                         "filling code array"
@@ -319,6 +327,7 @@ priority := SortedCollection new.
                                                     count := count + 1.
                                                 ].
                                             ].
+                                            stdout<<'[[' << count << ']]'.
                                             infile := FileStream open: arg
                                                         mode: FileStream read.
                                             [infile atEnd not] whileTrue: [
@@ -337,6 +346,7 @@ priority := SortedCollection new.
                                                 count := count + 1.
                                                 stdout << 0.
                                             ].
+                                             stdout<<'[[' << count << ']]'.
                                             stdout << nl 
                                         ]
                                         "(Smalltalk arguments size = 2)" "possible problems here? notice no period in prev line"
@@ -418,38 +428,244 @@ priority := SortedCollection new.
                             ifFalse: [
                                 arg:= (Smalltalk arguments at: 2).
                                 [
-                                    | infile bitColl "node1 node2 tree finalTree" |
+                                    | infile bitColl acc acc2 turns counter treeStack bitCollCopy node1 node2 tree finalTree isDone |
                                     infile := FileStream open: arg
                                                     mode: FileStream read.
-                                    bitColl := OrderedCollection new.               
+                                    bitColl := OrderedCollection new.           
+                                    treeStack := OrderedCollection new. 
                                     "collecting bits"
                                     [infile atBitEnd not] whileTrue: [
                                         | singleBit |
                                         singleBit := infile nextBit.
-                                        stdout << singleBit.
+                                        "stdout << singleBit."
                                         bitColl add: singleBit.
                                     ].
                                     infile close.
-                                        " deciphering bits " 
-                                    "freqTable keysAndValuesDo: [:key :value |
-                                        (value notNil and: [value > 0]) ifTrue: [
-                                            |leaf|
-                                            leaf := Leaf new: key count: value.
-                                            priority add: leaf.
-                                        ]
-                                    ]."
-                                    "[(priority size) > 1] whileTrue: [ 
-                                        node1 := priority removeFirst.
-                                        node2 := priority removeFirst.
-                                        tree := Tree new: (node1 char)  count: ((node1 count) + (node2 count)) left: node1 right: node2.
-                                        priority add: tree. 
+                                    
+                                    bitColl do: [ :singleBit |
+                                        stdout << singleBit.
                                     ].
-                                    finalTree := priority removeFirst."
+                                    stdout << nl.
+                                        " deciphering bits " 
+                                    turns := 2. "Start merging here with the second turn!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
+                                    [turns > 0] whileTrue: [
+                                        acc := (bitColl removeFirst) asInteger.
+                                        acc := 0.
+                                        counter := 8.
+                                        [counter > 0] whileTrue: [
+                                            acc2 := (bitColl removeFirst) asInteger.
+                                            stdout << acc2.
+                                            acc:= (acc bitAt: counter put: acc2).
+                                            counter:= counter - 1.
+                                        ].
+                                        stdout << '='<<acc << nl.
+                                        (acc = 0) 
+                                            ifTrue: [
+                                                acc2:= (bitColl removeFirst) asInteger.
+                                                (acc2 = 0)
+                                                    ifTrue: [ counter := 0 ]
+                                                    ifFalse: [ counter := 256 ].
+                                                node1 := Leaf new: counter count: 0.
+                                            ]
+                                            ifFalse:[
+                                                node1 := Leaf new: acc count: 0.
+                                            ].
+                                        treeStack add: node1.
+                                        turns := turns - 1. 
+                                    ].
+                                    stdout << treeStack << nl << treeStack size << nl.
+                                    "now working on deciphering rest of the tree"
+                                    [treeStack size > 1] whileTrue: [
+                                        acc := (bitColl removeFirst) asInteger.
+                                        (acc = 0) ifTrue: [
+                                            acc := 0.
+                                            counter := 8.
+                                            [counter > 0] whileTrue: [
+                                                acc2 := (bitColl removeFirst) asInteger.
+                                                stdout << acc2.
+                                                acc:= (acc bitAt: counter put: acc2).
+                                                counter:= counter - 1.
+                                            ].
+                                            stdout << '='<<acc << nl.
+                                            (acc = 0) 
+                                                ifTrue: [
+                                                    acc2:= (bitColl removeFirst) asInteger.
+                                                    (acc2 = 0)
+                                                        ifTrue: [ counter := 0 ]
+                                                        ifFalse: [ counter := 256 ].
+                                                    node1 := Leaf new: counter count: 0.
+                                                ]
+                                                ifFalse:[
+                                                    node1 := Leaf new: acc count: 0.
+                                                ].
+                                            treeStack add: node1.
+                                            turns := turns - 1. 
+                                        ].
+                                        (acc = 1) ifTrue: [
+                                            node2 := treeStack removeLast.
+                                            node1 := treeStack removeLast.
+                                            tree := Tree new: (node1 char ) count: 0 left: node1 right: node2.
+                                            treeStack add: tree.
+                                        ].
+                                    ].
+                                    
+                                    bitCollCopy := bitColl.
+                                    stdout << treeStack << nl << bitColl size "<< nl << bitCollCopy size "<< nl.
+                                    finalTree := treeStack removeLast.
                                         "filling code array"
-                                    "finalTree inorder: [:char :string |
-                                        codeTable at: (char asInteger) put: string.
-                                    ] prefix: ''."
+                                    finalTree inorder: [:char :string | "might not use"
+                                        codeTable at: char put: 1.
+                                    ] prefix: ''.
+                                    
+                                    acc := ''.
+                                    isDone := false.
+                                    tree:=  finalTree.
+                                    bitCollCopy do: [ :singleBit |
+                                        (isDone) ifFalse: [
+                                            acc := acc, (singleBit asString).
+                                            
+                                            ((singleBit asInteger) = 0) ifTrue:[ tree := tree left.]
+                                            ifFalse: [ tree:= tree right.].
+                                            (tree isLeaf) 
+                                                ifTrue: [
+                                                    stdout <<acc << '=' <<tree char << nl. 
+                                                    codeTable at: ((tree char) asInteger) put: 0.
+                                                    ((tree char) = 256) 
+                                                        ifTrue: [
+                                                            isDone := true
+                                                        ]. 
+                                                    tree := finalTree.
+                                                    acc := ''.
+                                                ]. 
+                                        ].
+                                            
+                                    ].
+                                    stdout << 'printed eof: ' << isDone << nl.
+                                    codeTable keysAndValuesDo: [:keys :value |
+                                        (value notNil and: [value > 0]) ifTrue: [
+                                            isDone := false. "means we did not have the correct tree"
+                                        ]
+                                    ].
+                                    "end merging here^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^"
+                                    
+                                    
+                                    stdout << 'is done: ' << isDone << nl.
+                                    (isDone) ifFalse: [  "Merge this with previous code!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
+                                        treeStack add: finalTree.
+                                        "[treeStack size > 1] whileTrue: ["
+                                            acc := (bitColl removeFirst) asInteger.
+                                            (acc = 0) ifTrue: [
+                                                acc := 0.
+                                                counter := 8.
+                                                [counter > 0] whileTrue: [
+                                                    acc2 := (bitColl removeFirst) asInteger.
+                                                    stdout << acc2.
+                                                    acc:= (acc bitAt: counter put: acc2).
+                                                    counter:= counter - 1.
+                                                ].
+                                                stdout << '='<<acc << nl.
+                                                (acc = 0) 
+                                                    ifTrue: [
+                                                        acc2:= (bitColl removeFirst) asInteger.
+                                                        (acc2 = 0)
+                                                            ifTrue: [ counter := 0 ]
+                                                            ifFalse: [ counter := 256 ].
+                                                        node1 := Leaf new: counter count: 0.
+                                                    ]
+                                                    ifFalse:[
+                                                        node1 := Leaf new: acc count: 0.
+                                                    ].
+                                                treeStack add: node1.
+                                                turns := turns - 1. 
+                                            ].
+                                            (acc = 1) ifTrue: [
+                                                node2 := treeStack removeLast.
+                                                node1 := treeStack removeLast.
+                                                tree := Tree new: (node1 char ) count: 0 left: node1 right: node2.
+                                                treeStack add: tree.
+                                            ].
+                                        "]."
+                                        
+                                        [treeStack size > 1] whileTrue: [
+                                            acc := (bitColl removeFirst) asInteger.
+                                            (acc = 0) ifTrue: [
+                                                acc := 0.
+                                                counter := 8.
+                                                [counter > 0] whileTrue: [
+                                                    acc2 := (bitColl removeFirst) asInteger.
+                                                    stdout << acc2.
+                                                    acc:= (acc bitAt: counter put: acc2).
+                                                    counter:= counter - 1.
+                                                ].
+                                                stdout << '='<<acc << nl.
+                                                (acc = 0) 
+                                                    ifTrue: [
+                                                        acc2:= (bitColl removeFirst) asInteger.
+                                                        (acc2 = 0)
+                                                            ifTrue: [ counter := 0 ]
+                                                            ifFalse: [ counter := 256 ].
+                                                        node1 := Leaf new: counter count: 0.
+                                                    ]
+                                                    ifFalse:[
+                                                        node1 := Leaf new: acc count: 0.
+                                                    ].
+                                                treeStack add: node1.
+                                                turns := turns - 1. 
+                                            ].
+                                            (acc = 1) ifTrue: [
+                                                node2 := treeStack removeLast.
+                                                node1 := treeStack removeLast.
+                                                tree := Tree new: (node1 char ) count: 0 left: node1 right: node2.
+                                                treeStack add: tree.
+                                            ].
+                                        ].
+                                        
+                                    ].
+                                    stdout <<treeStack<<nl.
+                                    
+                                    bitCollCopy := bitColl.
+                                    stdout << treeStack << nl << bitColl size "<< nl << bitCollCopy size "<< nl.
+                                    finalTree := treeStack removeLast.
+                                        "filling code array"
+                                    finalTree inorder: [:char :string | "might not use"
+                                        codeTable at: char put: 1.
+                                    ] prefix: ''.
+                                    
+                                    acc := ''.
+                                    isDone := false.
+                                    tree:=  finalTree.
+                                    bitCollCopy do: [ :singleBit |
+                                        (isDone) ifFalse: [
+                                            acc := acc, (singleBit asString).
+                                            
+                                            ((singleBit asInteger) = 0) ifTrue:[ tree := tree left.]
+                                            ifFalse: [ tree:= tree right.].
+                                            (tree isLeaf) 
+                                                ifTrue: [
+                                                    stdout <<acc << '=' <<tree char << nl. 
+                                                    codeTable at: ((tree char) asInteger) put: 0.
+                                                    ((tree char) = 256) 
+                                                        ifTrue: [
+                                                            isDone := true
+                                                        ]. 
+                                                    tree := finalTree.
+                                                    acc := ''.
+                                                ]. 
+                                        ].
+                                            
+                                    ].
+                                    stdout << 'printed eof: ' << isDone << nl.
+                                    codeTable keysAndValuesDo: [:keys :value |
+                                        (value notNil and: [value > 0]) ifTrue: [
+                                            isDone := false. "means we did not have the correct tree"
+                                        ]
+                                    ].
+                                    
+                                    
+                                    "end isDone ifFalse"
                                         "printing tree with the 't' flag"
+                                        
+                                        
                                     "(t) ifTrue:"
                                              "**** CHANGE THIS SO THAT WE USE CODE ARRAY ****"
                                         "[finalTree inorder: [:char :string |
